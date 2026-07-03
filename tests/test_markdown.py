@@ -32,7 +32,7 @@ def test_unsupported_extension_raises(tmp_path: Path) -> None:
         assert_supported(source)
 
 
-def test_markitdown_converts_all_supported_formats(tmp_path: Path) -> None:
+def test_converts_all_supported_formats(tmp_path: Path) -> None:
     files: list[Path] = []
 
     txt_path = tmp_path / "sample.txt"

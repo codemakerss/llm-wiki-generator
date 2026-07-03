@@ -9,7 +9,7 @@ description: Build or query a standalone Obsidian-compatible LLM Wiki from PDF, 
 
 Use this skill when you want a fully standalone LLM Wiki workflow:
 
-- convert common files into Markdown with `markitdown`
+- convert common files into Markdown with bundled document parsers
 - preview what knowledge updates should be archived
 - apply those updates into an Obsidian-compatible wiki vault
 - build a local searchable index
@@ -96,7 +96,7 @@ Run:
 .venv/bin/python skill/llm-wiki-generator/scripts/cli.py convert path/to/file.pdf
 ```
 
-Use this when you only want the Markdown output from `markitdown`.
+Use this when you only want to inspect the Markdown extraction result.
 
 ### 3. Preview archive updates
 
@@ -108,7 +108,7 @@ Run:
 
 This step uses:
 
-- `markitdown` for conversion
+- bundled parsers for document conversion
 - an OpenAI-compatible model if configured
 - a deterministic fallback if no model is configured
 
