@@ -1,155 +1,182 @@
 # LLM Wiki Generator
 
-LLM Wiki Generator is friendly to any AI agent, any team workflow, and standalone CLI usage. It turns unstructured documents into a searchable, traceable, Obsidian-compatible LLM Wiki.
+A preview-first document ingestion and retrieval workflow for building a structured, local, Obsidian-compatible LLM Wiki.
 
-It helps you ingest `PDF`, `DOCX`, `PPTX`, `XLSX`, and `TXT` files, preview knowledge updates before writing anything, archive structured wiki pages, build a local retrieval index, and answer questions from stable or draft knowledge.
+LLM Wiki Generator turns raw source files into traceable wiki knowledge through an explicit pipeline: `convert -> show-updates -> apply -> index -> answer`.
+It is designed for agent workflows, local knowledge systems, and standalone CLI usage where auditability matters more than direct "chat with files" convenience.
 
-## Why This Project Exists
+## Why This Exists
 
-Most teams already have a lot of useful knowledge, but it is scattered across long documents, meeting notes, historical writeups, feedback files, and external references.
+Most document-driven knowledge workflows break down in one of two ways:
 
-That creates a few common problems:
+- raw files remain unstructured and difficult to reuse
+- LLM-based ingestion writes too much, too early, with too little control
 
-- source formats are inconsistent
-- reusable knowledge is buried in long files
-- new material is hard to merge safely into an existing knowledge base
-- direct “chat with documents” setups often lack structure and auditability
+This project takes a stricter path.
 
-LLM Wiki Generator is designed around a safer workflow:
+Instead of treating source files as a chat substrate, it treats them as inputs to a staged knowledge pipeline:
 
-1. convert source files into Markdown
-2. preview archive updates first
-3. apply only the updates you want
-4. build a local retrieval index
-5. answer questions from the wiki
+1. convert source material into normalized text
+2. generate proposed wiki updates
+3. let the user review those updates
+4. write approved knowledge into a vault
+5. build a retrieval index over the result
 
-## Key Features
+The goal is not just answering questions.
+The goal is building a knowledge base that can keep evolving without becoming opaque.
 
-- Convert common document formats into Markdown
-- Preview archive changes before writing anything
-- Write structured wiki pages into an Obsidian-compatible vault
-- Build a local SQLite retrieval index
-- Answer questions from stable knowledge or include draft knowledge when needed
-- Work with an OpenAI-compatible model or fall back to deterministic behavior
-- Fit into skill-based installation flows with dependency preflight guidance
+## Quick Navigation
+
+- [Docs Navigation](#docs-navigation)
+- [Workflow](#workflow)
+- [Quick Start](#quick-start)
+- [Example Commands](#example-commands)
+- [Vault Structure](#vault-structure)
+- [Source Types](#source-types-and-boundaries)
+
+## Docs Navigation
+
+- [Chinese Overview](docs/README.zh-home.md)
+- [Chinese Usage Guide](docs/README.zh-usage.md)
+- [English Usage Guide](docs/README.en-usage.md)
+- [Docs Index](docs/index.md)
 
 ## Workflow
 
-```text
-Source File
-  -> convert
-  -> show-updates
-  -> apply
-  -> index
-  -> answer
+```mermaid
+flowchart TD
+    A["Invoke Skill or CLI"] --> B{"Initialized?"}
+
+    B -- "No" --> C["Ask whether to initialize now"]
+    C --> D["Ask where the wiki vault should live"]
+    D --> E["Confirm the chosen path"]
+    E --> F["Run bootstrap-init"]
+    F --> G["Persist WIKI_ROOT and WIKI_INDEX_DB into .env"]
+    G --> H["Create vault directories and bootstrap files"]
+    H --> I["Ask whether to provide the first document now"]
+
+    B -- "Yes" --> J["Provide source document"]
+    I --> J
+
+    J --> K["convert"]
+    K --> L["show-updates"]
+    L --> M{"Approve proposed archive updates?"}
+    M -- "No" --> N["Stop or revise source input"]
+    M -- "Yes" --> O["apply"]
+    O --> P["index"]
+    P --> Q["answer"]
 ```
 
-Command meanings:
+## Properties
 
-- `convert`: extract Markdown from a source file
-- `show-updates`: preview which wiki pages would be created or updated
-- `apply`: copy raw files and write wiki pages
-- `index`: build the local SQLite/FTS retrieval index
-- `answer`: retrieve from the wiki and answer a question
-
-## Supported Inputs
-
-- `PDF`
-- `DOCX`
-- `PPTX`
-- `XLSX`
-- `TXT`
+- Supports `PDF`, `DOCX`, `PPTX`, `XLSX`, and `TXT`
+- Uses a preview-before-write archive flow
+- Writes into an Obsidian-compatible vault layout
+- Keeps raw sources and structured knowledge separate
+- Builds a local SQLite retrieval index
+- Supports stable and draft knowledge scopes
+- Provides bootstrap-style initialization for first-time setup
+- Persists chosen vault paths into `.env`
 
 ## Quick Start
 
-### 1. Install as a skill
+### Option A: Skill-first workflow
 
-If your host environment supports an `npx install skill` style entrypoint, the recommended flow is to install this project as a skill before using it as a CLI.
-
-For example:
+If your host environment supports skill installation:
 
 ```bash
 npx install skill llm-wiki-generator
 ```
 
-After installation, the skill should run a local preflight check that validates:
-
-- `Python 3` is installed
-- `pip` is available
-- required Python packages are available
-- `.env` exists and core configuration is present
-
-If the environment is incomplete, the skill should clearly tell the user what is missing, for example:
-
-- missing `Python 3`
-- missing `pip`
-- missing required Python packages: `markitdown[all]`, `openai`, `pydantic`, `python-dotenv`, `pyyaml`, `rich`, `typer`
-- missing optional packages for extended document workflows: `pytest`, `python-docx`, `python-pptx`, `openpyxl`, `reportlab`
-
-After the user agrees, the installer can install the missing dependencies and then continue.
-
-Note: this repository already provides `requirements.txt`, but the automatic “check first, ask for consent, then install” flow is better implemented by the skill installer or host platform wrapper.
-
-### 2. Install dependencies manually
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Create your environment file
-
-```bash
-cp .env.example .env
-```
-
-Important configuration values:
-
-- `LLM_BASE_URL`
-- `LLM_API_KEY`
-- `LLM_MODEL`
-- `WIKI_ROOT`
-- `WIKI_INDEX_DB`
-- `WIKI_SCOPE`
-
-If no model is configured, the project still works in deterministic fallback mode.
-
-### 4. Check initialization status
-
-Before your first archive/query flow, check whether the wiki has already been initialized:
+Check whether the workspace has already been initialized:
 
 ```bash
 python scripts/cli.py bootstrap-status --as-json
 ```
 
-If the wiki is not initialized yet, the skill should first ask:
-
-- whether you want to initialize now
-- where the wiki vault should be created
-- whether the confirmed path is correct
-
-Then initialize it by persisting the chosen location and creating the vault structure:
+If not initialized, create the vault at the chosen path:
 
 ```bash
 python scripts/cli.py bootstrap-init path/to/wiki-vault
 ```
 
-This writes:
+Once initialized, continue directly into document ingestion.
 
-- `WIKI_ROOT=<chosen wiki root>`
-- `WIKI_INDEX_DB=<sibling index.sqlite3 path>`
+### Option B: Manual CLI workflow
 
-and immediately prepares the folder structure.
+Install dependencies:
 
-### 5. Initialize the vault directly
+```bash
+pip install -r requirements.txt
+```
+
+Create the environment file:
+
+```bash
+cp .env.example .env
+```
+
+Then either inspect bootstrap status:
+
+```bash
+python scripts/cli.py bootstrap-status --as-json
+```
+
+Or initialize directly if the vault path is already configured:
 
 ```bash
 python scripts/cli.py init
 ```
 
-This creates a structure like:
+## Example Commands
+
+Convert a file:
+
+```bash
+python scripts/cli.py convert path/to/file.pdf
+```
+
+Preview archive updates:
+
+```bash
+python scripts/cli.py show-updates path/to/file.docx --source-type team_history
+```
+
+Apply approved updates:
+
+```bash
+python scripts/cli.py apply path/to/file.docx --source-type team_history
+```
+
+Build the retrieval index:
+
+```bash
+python scripts/cli.py index
+```
+
+Query the wiki:
+
+```bash
+python scripts/cli.py answer "What business constraints are currently known?"
+```
+
+Include draft knowledge:
+
+```bash
+python scripts/cli.py answer "What design ideas were mentioned in team history?" --scope stable-draft
+```
+
+## Vault Structure
+
+A typical initialized workspace looks like this:
 
 ```text
 10-raw/
+  business_fact/
+  industry_practice/
+  team_history/
+  feedback/
+
 20-wiki/
   sources/
   entities/
@@ -159,55 +186,9 @@ This creates a structure like:
   prd-patterns/
   index.md
   log.md
+
+index.sqlite3
 ```
-
-If you already know your desired `WIKI_ROOT`, you can still run the original initializer directly:
-
-```bash
-python scripts/cli.py init
-```
-
-`init` remains deterministic and uses the current `.env` configuration.
-
-## Example Commands
-
-### Convert only
-
-```bash
-python scripts/cli.py convert path/to/file.pdf
-```
-
-### Preview archive updates
-
-```bash
-python scripts/cli.py show-updates path/to/file.docx --source-type team_history
-```
-
-### Apply archive updates
-
-```bash
-python scripts/cli.py apply path/to/file.docx --source-type team_history
-```
-
-### Build the retrieval index
-
-```bash
-python scripts/cli.py index
-```
-
-### Ask a question
-
-```bash
-python scripts/cli.py answer "What business constraints are currently known?"
-```
-
-Include draft knowledge when needed:
-
-```bash
-python scripts/cli.py answer "What design ideas were mentioned in team history?" --scope stable-draft
-```
-
-After a successful first-time initialization, the skill should immediately ask whether you want to provide your first document now. If you do, continue directly into `show-updates` and `apply`.
 
 ## Source Types and Boundaries
 
@@ -218,33 +199,45 @@ Supported `source_type` values:
 - `team_history`
 - `feedback`
 
-Boundary rules:
+Behavior rules:
 
 - `business_fact` may become stable business knowledge when evidence is strong
-- `industry_practice` may become patterns or synthesis, but should not be treated as customer truth
+- `industry_practice` may become patterns or synthesis, but not customer truth
 - `team_history` defaults to `draft`
 - `feedback` defaults to `draft`
 - conflicts never overwrite older knowledge; they go into `20-wiki/conflicts/`
 
-## Who It Is For
+## Design Intent
 
-- teams building an auditable local knowledge workflow
-- developers who want a reusable Codex skill for archive-and-retrieval flows
-- practitioners who prefer “preview before write” instead of direct blind ingestion
-- anyone who wants a lightweight bridge from documents to structured wiki knowledge
+This repository prefers explicit state transitions over opaque ingestion.
+
+Key design choices:
+
+- preview before write
+- deterministic archive application
+- persistent raw source capture
+- local retrieval over archived markdown
+- configurable LLM usage, but usable fallback behavior without it
+
+The result is closer to a small knowledge compiler than a chat wrapper around files.
+
+## Who This Is For
+
+- developers building agent-oriented knowledge workflows
+- teams that need local, inspectable, versionable knowledge artifacts
+- users who want a stricter alternative to direct document chat
+- individuals maintaining a structured personal wiki knowledge base
 
 ## Tech Stack
 
-- `Python`
-- `Typer`
-- `Rich`
-- `Pydantic`
-- `markitdown`
-- `SQLite FTS`
-- `OpenAI-compatible API`
+- Python
+- Typer
+- Rich
+- Pydantic
+- SQLite FTS
+- OpenAI-compatible API
+- document parsers for DOCX, PPTX, XLSX, and PDF
 
-## Positioning
+## Learn More
 
-This project is primarily designed as a reusable skill, but it is intentionally platform-agnostic and does not depend on one specific agent runtime.
-
-If you want a small, practical pipeline for converting files, reviewing knowledge updates, archiving them safely, and retrieving answers later, this is the core idea of the project.
+Detailed usage guides live in [`docs/`](docs/).

@@ -1,5 +1,7 @@
 # LLM Wiki Generator Usage Guide
 
+[Back to README](../README.md) | [Docs Index](index.md) | [Chinese Overview](README.zh-home.md)
+
 LLM Wiki Generator is friendly to any AI agent, any team workflow, and standalone CLI usage. It can be used as a skill or run directly as a Python CLI. Its goal is not just to “chat with files,” but to convert incoming material into structured wiki knowledge first, then retrieve and answer from that knowledge base in a controlled way.
 
 This draft is written as an operational guide for people who want to ingest files, preview archive updates, write wiki pages, and query the resulting knowledge base.
@@ -45,7 +47,7 @@ If the environment is not ready, the skill should report what is missing, for ex
 
 - `Python 3 is not installed`
 - `pip is not available`
-- `Missing Python packages: markitdown[all], openai, pydantic, python-dotenv, pyyaml, rich, typer`
+- `Missing Python packages: openai, pydantic, python-dotenv, pyyaml, rich, typer`
 - `Optional packages missing for extended document support: pytest, python-docx, python-pptx, openpyxl, reportlab`
 
 Once the user approves, the installer can install all missing dependencies before the skill is used.

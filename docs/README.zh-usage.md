@@ -1,5 +1,7 @@
 # LLM Wiki Generator 使用文档
 
+[Back to README](../README.md) | [Docs Index](index.md) | [中文首页介绍](README.zh-home.md)
+
 `LLM Wiki Generator` 是一个对任何 AI agent、任何团队工作流、以及独立 CLI 使用都友好的工具。它既可以作为 skill 使用，也可以直接作为 Python CLI 运行。它的目标不是“直接把文档丢给模型问答”，而是先把知识转成结构化 wiki，再基于稳定知识进行检索和回答。
 
 这份文档更偏实际操作，适合你准备开始导入资料、预览归档、生成知识页面和问答时使用。
@@ -45,7 +47,7 @@ npx install skill llm-wiki-generator
 
 - `Python 3 is not installed`
 - `pip is not available`
-- `Missing Python packages: typer, rich, pydantic, python-dotenv, openai, markitdown[all], pyyaml`
+- `Missing Python packages: typer, rich, pydantic, python-dotenv, openai, pyyaml`
 - `Optional packages missing for extended document support: python-docx, python-pptx, openpyxl, reportlab`
 
 然后在得到用户同意后，再安装全部依赖，再继续运行。
@@ -158,7 +160,7 @@ python scripts/cli.py convert path/to/file.pdf
 
 适用场景：
 
-- 只想看 `markitdown` 的转换效果
+- 只想看当前文档解析结果是否符合预期
 - 先验证源文件内容是否可被正常抽取
 - 调试导入前的原始文本质量
 
