@@ -7,7 +7,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-@dataclass(slots=True)
+ENV_FILENAME = ".env"
+
+
+@dataclass
 class Settings:
     skill_root: Path
     wiki_root: Path
@@ -20,11 +23,57 @@ class Settings:
     default_scope: str
 
 
+def env_file_path(skill_root: Path) -> Path:
+    return skill_root / ENV_FILENAME
+
+
+def load_env_file_map(skill_root: Path) -> dict[str, str]:
+    env_path = env_file_path(skill_root)
+    if not env_path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def write_env_values(skill_root: Path, updates: dict[str, str]) -> Path:
+    env_path = env_file_path(skill_root)
+    existing_lines: list[str] = []
+    if env_path.exists():
+        existing_lines = env_path.read_text(encoding="utf-8").splitlines()
+
+    pending = dict(updates)
+    rendered: list[str] = []
+    for line in existing_lines:
+        if "=" not in line or line.lstrip().startswith("#"):
+            rendered.append(line)
+            continue
+        key, _ = line.split("=", 1)
+        stripped_key = key.strip()
+        if stripped_key in pending:
+            rendered.append(f"{stripped_key}={pending.pop(stripped_key)}")
+        else:
+            rendered.append(line)
+
+    for key, value in pending.items():
+        rendered.append(f"{key}={value}")
+
+    payload = "\n".join(rendered).rstrip() + "\n"
+    env_path.write_text(payload, encoding="utf-8")
+    return env_path
+
+
 def load_settings() -> Settings:
     skill_root = Path(__file__).resolve().parents[2]
-    dotenv_path = skill_root / ".env"
+    dotenv_path = env_file_path(skill_root)
     if dotenv_path.exists():
-        load_dotenv(dotenv_path)
+        load_dotenv(dotenv_path, override=True)
     else:
         load_dotenv()
 

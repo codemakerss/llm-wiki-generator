@@ -113,7 +113,33 @@ cp .env.example .env
 
 如果没有配置模型，也可以先使用 deterministic fallback 进行预览与摘录式回答。
 
-### 4. 初始化 wiki vault
+### 4. 检查是否已经初始化
+
+在第一次真正归档或问答之前，推荐先检查当前 wiki 是否已经完成初始化：
+
+```bash
+python scripts/cli.py bootstrap-status --as-json
+```
+
+如果还没有初始化，skill 应先和用户确认：
+
+- 是否现在初始化
+- wiki 文件准备放到哪个路径
+- 当前确认的路径是否正确
+
+确认后可以执行：
+
+```bash
+python scripts/cli.py bootstrap-init path/to/wiki-vault
+```
+
+这个过程会自动：
+
+- 把 `WIKI_ROOT` 写入 `.env`
+- 把 `WIKI_INDEX_DB` 写成与 wiki 根目录同级的 `index.sqlite3`
+- 创建完整的 vault 目录结构
+
+### 5. 直接初始化 wiki vault
 
 ```bash
 python scripts/cli.py init
@@ -132,6 +158,12 @@ python scripts/cli.py init
   prd-patterns/
   index.md
   log.md
+```
+
+如果你已经提前配置好了 `.env` 里的路径，也可以继续直接使用原来的初始化命令：
+
+```bash
+python scripts/cli.py init
 ```
 
 ## 使用示例
@@ -171,6 +203,8 @@ python scripts/cli.py answer "当前已知的业务约束是什么？"
 ```bash
 python scripts/cli.py answer "团队历史里提到的设计思路有哪些？" --scope stable-draft
 ```
+
+第一次初始化成功后，skill 应立即继续询问用户是否现在提供第一份文档；如果用户同意，就可以直接进入 `show-updates` 和 `apply` 流程。
 
 ## 来源类型与归档边界
 

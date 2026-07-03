@@ -17,6 +17,44 @@ Use this skill when you want a fully standalone LLM Wiki workflow:
 
 This skill does not depend on BA-Agent code, does not use `WikiUpdatePlan`, and does not require an approval step. It shows archive updates first, then writes pages directly when you run `apply`.
 
+## Initialization Guard
+
+Before doing any archive, indexing, or answer work, first check whether the wiki has already been initialized.
+
+Use:
+
+```bash
+.venv/bin/python skill/llm-wiki-generator/scripts/cli.py bootstrap-status --as-json
+```
+
+Behavior:
+
+- if `initialized=true`, continue with the normal workflow
+- if `initialized=false`, do not continue directly into archive or answer steps
+- instead, start a short onboarding dialogue with the user
+
+When initialization is missing, ask in this order:
+
+1. whether they want to initialize now
+2. which filesystem path should hold the wiki vault
+3. repeat the chosen path back to them and ask for confirmation
+
+After the user confirms, run:
+
+```bash
+.venv/bin/python skill/llm-wiki-generator/scripts/cli.py bootstrap-init /absolute/or/relative/wiki-root
+```
+
+This will:
+
+- write `WIKI_ROOT` into `.env`
+- write `WIKI_INDEX_DB` into `.env` as a sibling to the chosen wiki root
+- create the full vault structure under the confirmed path
+
+Immediately after a successful initialization, ask the user whether they want to provide their first document now.
+
+If the user declines initialization, stop the archive/query flow and explain that initialization is required before the skill can continue.
+
 ## Supported Inputs
 
 The archive pipeline accepts exactly these five file types:

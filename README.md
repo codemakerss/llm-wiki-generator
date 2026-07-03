@@ -113,7 +113,34 @@ Important configuration values:
 
 If no model is configured, the project still works in deterministic fallback mode.
 
-### 4. Initialize the vault
+### 4. Check initialization status
+
+Before your first archive/query flow, check whether the wiki has already been initialized:
+
+```bash
+python scripts/cli.py bootstrap-status --as-json
+```
+
+If the wiki is not initialized yet, the skill should first ask:
+
+- whether you want to initialize now
+- where the wiki vault should be created
+- whether the confirmed path is correct
+
+Then initialize it by persisting the chosen location and creating the vault structure:
+
+```bash
+python scripts/cli.py bootstrap-init path/to/wiki-vault
+```
+
+This writes:
+
+- `WIKI_ROOT=<chosen wiki root>`
+- `WIKI_INDEX_DB=<sibling index.sqlite3 path>`
+
+and immediately prepares the folder structure.
+
+### 5. Initialize the vault directly
 
 ```bash
 python scripts/cli.py init
@@ -133,6 +160,14 @@ This creates a structure like:
   index.md
   log.md
 ```
+
+If you already know your desired `WIKI_ROOT`, you can still run the original initializer directly:
+
+```bash
+python scripts/cli.py init
+```
+
+`init` remains deterministic and uses the current `.env` configuration.
 
 ## Example Commands
 
@@ -171,6 +206,8 @@ Include draft knowledge when needed:
 ```bash
 python scripts/cli.py answer "What design ideas were mentioned in team history?" --scope stable-draft
 ```
+
+After a successful first-time initialization, the skill should immediately ask whether you want to provide your first document now. If you do, continue directly into `show-updates` and `apply`.
 
 ## Source Types and Boundaries
 

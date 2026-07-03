@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -10,6 +11,7 @@ from rich.table import Table
 
 from llm_wiki_generator.answer import answer_question
 from llm_wiki_generator.archive import apply_preview, archive_source
+from llm_wiki_generator.bootstrap import initialize_wiki_location, inspect_bootstrap
 from llm_wiki_generator.config import load_settings
 from llm_wiki_generator.indexer import build_index
 from llm_wiki_generator.markdown import convert_to_markdown
@@ -43,8 +45,45 @@ def init() -> None:
         console.print(f"[green]ready[/green] {path}")
 
 
+@app.command("bootstrap-status")
+def bootstrap_status(as_json: bool = False) -> None:
+    skill_root = Path(__file__).resolve().parents[1]
+    status = inspect_bootstrap(skill_root)
+    payload = status.to_dict()
+    if as_json:
+        console.print_json(json.dumps(payload, ensure_ascii=False))
+        return
+
+    console.print(
+        Panel.fit(
+            "\n".join(
+                [
+                    f"Configured: {status.configured}",
+                    f"Initialized: {status.initialized}",
+                    f"Env file: {status.env_path}",
+                    f"Wiki root: {status.wiki_root or '(unset)'}",
+                    f"Index DB: {status.index_db or '(unset)'}",
+                    f"Missing paths: {', '.join(status.missing_paths) or '(none)'}",
+                ]
+            ),
+            title="Bootstrap Status",
+        )
+    )
+
+
+@app.command("bootstrap-init")
+def bootstrap_init(wiki_root: Path) -> None:
+    skill_root = Path(__file__).resolve().parents[1]
+    settings, created, env_path = initialize_wiki_location(skill_root, wiki_root)
+    console.print(f"[green]configured[/green] {env_path}")
+    console.print(f"[green]wiki-root[/green] {settings.wiki_root}")
+    console.print(f"[green]index-db[/green] {settings.index_db}")
+    for path in created:
+        console.print(f"[green]ready[/green] {path}")
+
+
 @app.command()
-def convert(source: Path, output: Path | None = None) -> None:
+def convert(source: Path, output: Optional[Path] = None) -> None:
     document = convert_to_markdown(source)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +145,7 @@ def index() -> None:
 
 
 @app.command()
-def answer(question: str, scope: str | None = None, limit: int = 5) -> None:
+def answer(question: str, scope: Optional[str] = None, limit: int = 5) -> None:
     settings = load_settings()
     resolved_scope = parse_scope(scope or settings.default_scope)
     response = answer_question(settings, question, resolved_scope, limit=limit)

@@ -86,6 +86,34 @@ Notes:
 
 ## 3. Initialize the Vault
 
+Before archiving anything, first check whether the workspace has already been initialized:
+
+```bash
+python scripts/cli.py bootstrap-status --as-json
+```
+
+If initialization is missing, the recommended flow is:
+
+1. ask whether the user wants to initialize now
+2. ask where the wiki vault should be created
+3. repeat the chosen path for confirmation
+4. initialize the vault and persist the location into `.env`
+5. immediately ask whether the user wants to provide the first document now
+
+The corresponding initialization command is:
+
+```bash
+python scripts/cli.py bootstrap-init path/to/wiki-vault
+```
+
+It will:
+
+- write `WIKI_ROOT`
+- write `WIKI_INDEX_DB` next to the wiki root
+- create the full vault structure
+
+If the desired path is already configured in `.env`, you can still use the original initializer directly.
+
 Before archiving anything, initialize the workspace:
 
 ```bash
@@ -270,6 +298,7 @@ Recommended habit:
 - always run `show-updates` before `apply`
 - rebuild the index after a batch of archive operations
 - use `stable-draft` when historical or exploratory material matters
+- after first-time initialization, decide immediately whether to ingest the first document so the onboarding flow can continue without interruption
 
 ## 7. Model Mode vs Fallback Mode
 

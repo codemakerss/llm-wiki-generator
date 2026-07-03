@@ -9,4 +9,5 @@ pytest
 python-docx
 python-pptx
 openpyxl
+pypdf
 reportlab
