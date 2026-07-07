@@ -4,15 +4,16 @@
 
 LLM Wiki Generator is friendly to any AI agent, any team workflow, and standalone CLI usage. It can be used as a skill or run directly as a Python CLI. Its goal is not just to “chat with files,” but to convert incoming material into structured wiki knowledge first, then retrieve and answer from that knowledge base in a controlled way.
 
-This guide is written for people who want to ingest files, preview archive updates, write wiki pages, and query the resulting knowledge base.
+This guide is written for people who want to ingest files, archive them directly, write wiki pages, and query the resulting knowledge base.
 
 ## 1. What It Does
 
 The project provides five core capabilities:
 
 - Markdown conversion with `convert`
-- archive preview with `show-updates`
-- archive write with `apply`
+- direct archive with `archive`
+- optional archive preview with `show-updates`
+- write without automatic reindexing with `apply`
 - local indexing with `index`
 - question answering with `answer`
 
@@ -84,7 +85,7 @@ Notes:
 - `WIKI_ROOT` is where the wiki vault is written
 - `WIKI_INDEX_DB` is the local SQLite index file
 - `WIKI_SCOPE` controls the default retrieval scope for `answer`
-- if `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` are not fully configured, the tool falls back to deterministic behavior
+- `archive`, `show-updates`, and `apply` require `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`; `answer` can still fall back to extractive output without a model
 
 ## 3. Initialize the Vault
 
@@ -164,6 +165,32 @@ Useful when you want to:
 - validate that the source document can be parsed cleanly
 - debug ingestion quality before archive preview
 
+### `archive`
+
+Run LLM extraction, write the result into the wiki, and rebuild the retrieval index by default.
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history
+```
+
+What it does:
+
+1. copies the original file into `10-raw/<source_type>/`
+2. writes structured pages into `20-wiki/`
+3. merges metadata if a target page already exists
+4. appends new content as an update block on existing pages
+5. updates `20-wiki/index.md`
+6. appends an entry to `20-wiki/log.md`
+7. rebuilds the SQLite retrieval index for immediate `answer` recall
+
+If you are importing many files and want to reindex once at the end, use:
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history --no-index
+```
+
+Then run `index` after the batch.
+
 ### `show-updates`
 
 Preview archive output without writing any wiki pages.
@@ -181,11 +208,12 @@ This returns an `ArchivePreview` describing:
 - evidence snippets
 - archive rationale
 
-This is the review step in the workflow.
+This is an optional audit step when you want to inspect what the LLM would write before archiving.
+It requires a configured OpenAI-compatible LLM. If model configuration is missing or the model response is invalid, the command fails without writing archive files.
 
 ### `apply`
 
-Write the previewed archive result into the wiki.
+Run LLM extraction and write the result into the wiki without automatically rebuilding the retrieval index.
 
 ```bash
 python scripts/cli.py apply path/to/file.docx --source-type team_history
@@ -200,7 +228,7 @@ What it does:
 5. updates `20-wiki/index.md`
 6. appends an entry to `20-wiki/log.md`
 
-In other words, `apply` is the actual archive step.
+If you want the archived knowledge to be immediately available for recall, prefer `archive`.
 
 ### `index`
 
@@ -270,6 +298,7 @@ Use for:
 Behavior:
 
 - defaults to `draft`
+- may also produce `prd_pattern` pages from historical PRDs, team decisions, requirement structures, review flows, and reusable product judgment patterns
 
 ### `feedback`
 
@@ -289,47 +318,45 @@ Assume you have a historical team document at `docs/team-retro.docx`:
 
 ```bash
 python scripts/cli.py init
-python scripts/cli.py show-updates docs/team-retro.docx --source-type team_history
-python scripts/cli.py apply docs/team-retro.docx --source-type team_history
-python scripts/cli.py index
+python scripts/cli.py archive docs/team-retro.docx --source-type team_history
 python scripts/cli.py answer "What architecture ideas kept recurring over time?" --scope stable-draft
 ```
 
 Recommended habit:
 
-- always run `show-updates` before `apply`
-- rebuild the index after a batch of archive operations
+- use `archive` for daily ingestion so LLM output is written and indexed immediately
+- use `show-updates` only when you need to audit the proposed output first
+- use `archive --no-index` for batch imports, then run `index` once at the end
 - use `stable-draft` when historical or exploratory material matters
 - after first-time initialization, decide immediately whether to ingest the first document so the onboarding flow can continue without interruption
 
-## 7. Model Mode vs Fallback Mode
+## 7. Model Requirements
 
-When an OpenAI-compatible model is configured:
+For archive upload flows, an OpenAI-compatible model is required:
 
-- archive preview is more intelligent
-- answers are more natural and synthesis-oriented
+- `show-updates` requires a model-generated archive preview
+- `archive` and `apply` fail during LLM extraction if the model is unavailable or returns invalid JSON
+- failed archive preview does not copy raw files or write wiki pages
 
-When no model is configured:
+For answer flows, no-model mode is still usable:
 
-- `show-updates` still returns a deterministic preview
 - `answer` falls back to an extractive response style
 
-That means the project remains usable even in no-model mode.
+That means archiving is strict, while retrieval remains usable for already-indexed content.
 
 ## 8. Mental Model
 
 The recommended way to think about the workflow is:
 
 1. `init` prepares the vault
-2. `show-updates` reviews proposed knowledge changes
-3. `apply` archives the approved changes
-4. `index` prepares retrieval
-5. `answer` consumes the archived knowledge
+2. `archive` extracts, writes, and indexes knowledge
+3. `answer` consumes the archived knowledge
 
 The key distinction is simple:
 
 - `convert` extracts
-- `show-updates` reviews
-- `apply` archives
+- `archive` extracts with LLM, archives, and indexes
+- `show-updates` optionally reviews
+- `apply` archives without automatic reindexing
 - `index` prepares retrieval
 - `answer` uses the knowledge base

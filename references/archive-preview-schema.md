@@ -1,6 +1,8 @@
 # ArchivePreview Schema
 
-`show-updates` and `apply` use `ArchivePreview`, not `WikiUpdatePlan`.
+`archive`, `show-updates`, and `apply` use `ArchivePreview`, not `WikiUpdatePlan`.
+Archive extraction requires a configured LLM; invalid or unavailable LLM responses must stop the archive flow.
+`team_history` may produce `prd_pattern`, but those updates are enforced as `draft`.
 
 ```json
 {

@@ -1,9 +1,9 @@
 # LLM Wiki Generator
 
-一个以预览为先的文档归档与检索工作流，用来构建结构化、本地化、兼容 Obsidian 的 LLM Wiki。
+一个以 LLM 直接归档为核心的文档归档与检索工作流，用来构建结构化、本地化、兼容 Obsidian 的 LLM Wiki。
 
-LLM Wiki Generator 通过一条显式流水线把原始文件转成可追溯的 wiki 知识：`convert -> show-updates -> apply -> index -> answer`。
-它适合 agent 工作流、本地知识系统，以及独立 CLI 场景，尤其适合那些更在意可审阅性和可控性，而不是直接“对着文件聊天”的使用方式。
+LLM Wiki Generator 通过一条直接流水线把原始文件转成可追溯的 wiki 知识：`archive -> answer`。
+需要审计时，也可以先用 `show-updates` 查看 LLM 会写入什么。
 
 [Back to README](../README.md) | [Docs Index](index.md) | [中文使用说明](README.zh-usage.md)
 
@@ -12,20 +12,19 @@ LLM Wiki Generator 通过一条显式流水线把原始文件转成可追溯的 
 很多基于文档的知识流程最后都会卡在两类问题上：
 
 - 原始文件一直是原始文件，难以结构化复用
-- LLM 归档过早写入、写得过多、缺少中间审阅环节
+- LLM 归档写成了不可追踪的临时回答，后续很难召回
 
-这个项目选择了更严格的一条路。
+这个项目选择了更结构化的一条路。
 
-它不把源文件当作聊天上下文，而是把它们当作一条分阶段知识流水线的输入：
+它不把源文件当作聊天上下文，而是把它们当作 LLM-backed knowledge compiler 的输入：
 
 1. 先把源资料转换成规范化文本
-2. 再生成拟议的 wiki 更新
-3. 让用户先审阅这些更新
-4. 只把确认后的知识写入 vault
-5. 最后在结果上建立检索索引
+2. 用 LLM 抽取结构化 wiki 更新
+3. 直接把知识写入 vault
+4. 最后在结果上建立检索索引
 
 目标不只是“能回答问题”。
-更重要的是让知识库可以持续演化，同时仍然保持可解释、可检查、可追溯。
+更重要的是让知识库可以持续演化，同时保持可检索、可追溯。
 
 ## 快速导航
 
@@ -61,13 +60,13 @@ flowchart TD
     B -- "是" --> J["提供源文档"]
     I --> J
 
-    J --> K["convert"]
-    K --> L["show-updates"]
-    L --> M{"是否批准这些归档更新?"}
-    M -- "否" --> N["停止或调整输入文档"]
-    M -- "是" --> O["apply"]
-    O --> P["index"]
+    J --> K["archive"]
+    K --> L["LLM 抽取结构化更新"]
+    L --> M["写入原文件与 wiki 页面"]
+    M --> P["index"]
     P --> Q["answer"]
+
+    J -. "可选审计路径" .-> R["show-updates"]
 ```
 
 ## 首次使用路径
@@ -78,15 +77,18 @@ flowchart TD
 2. 运行 `bootstrap-status`
 3. 如果还没初始化，就运行 `bootstrap-init`
 4. 提供第一份源文档
-5. 用 `show-updates` 审阅拟议归档内容
-6. 确认后执行 `apply`、`index`，再开始提问
+5. 执行 `archive`，让 LLM 抽取并直接写入知识库
+6. 开始基于已索引 wiki 提问
 
 如果你已经明确知道 vault 路径，也可以先配好 `.env`，然后直接调用 `init`。
+上传归档的 `archive`、`show-updates` 和 `apply` 必须配置 OpenAI-compatible LLM；无模型 fallback 只保留给问答摘录场景。
 
 ## 核心特性
 
 - 支持 `PDF`、`DOCX`、`PPTX`、`XLSX`、`TXT`
-- 采用 preview-before-write 的归档方式
+- 采用 LLM-first 的直接归档方式
+- 上传归档预览必须由 LLM 生成
+- 直接归档后默认重建检索索引
 - 输出为兼容 Obsidian 的 vault 结构
 - 原始文件与结构化知识分层保存
 - 本地 SQLite 检索索引
@@ -154,16 +156,22 @@ python scripts/cli.py init
 python scripts/cli.py convert path/to/file.pdf
 ```
 
-预览归档更新：
+直接归档并重建索引：
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history
+```
+
+可选预览归档更新：
 
 ```bash
 python scripts/cli.py show-updates path/to/file.docx --source-type team_history
 ```
 
-应用归档更新：
+归档但不重建索引：
 
 ```bash
-python scripts/cli.py apply path/to/file.docx --source-type team_history
+python scripts/cli.py archive path/to/file.docx --source-type team_history --no-index
 ```
 
 构建检索索引：
@@ -221,7 +229,7 @@ index.sqlite3
 
 - `business_fact` 在证据足够强时可进入稳定业务知识
 - `industry_practice` 可形成 pattern 或 synthesis，但不应被当作客户事实
-- `team_history` 默认进入 `draft`
+- `team_history` 也可以从历史 PRD 和团队决策中提取 PRD pattern，但仍默认进入 `draft`
 - `feedback` 默认进入 `draft`
 - 冲突内容不会覆盖旧知识，而是写入 `20-wiki/conflicts/`
 
@@ -231,11 +239,11 @@ index.sqlite3
 
 核心设计选择包括：
 
-- preview before write
+- 默认直接 LLM 归档
 - deterministic archive application
 - 持久保存原始文件
 - 对归档后的 markdown 做本地检索
-- LLM 可配置，但无模型时也能退回到可用的 fallback
+- 归档预览必须使用 LLM，问答场景保留无模型摘录式 fallback
 
 最终效果更像一个小型 knowledge compiler，而不是简单包了一层文档聊天。
 

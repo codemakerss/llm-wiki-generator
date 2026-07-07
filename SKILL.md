@@ -10,12 +10,12 @@ description: Build or query a standalone Obsidian-compatible LLM Wiki from PDF, 
 Use this skill when you want a fully standalone LLM Wiki workflow:
 
 - convert common files into Markdown with bundled document parsers
-- preview what knowledge updates should be archived
-- apply those updates into an Obsidian-compatible wiki vault
+- archive source documents directly after LLM extraction
+- optionally preview what knowledge updates would be archived
 - build a local searchable index
 - answer questions from stable or draft wiki knowledge
 
-This skill does not depend on BA-Agent code, does not use `WikiUpdatePlan`, and does not require an approval step. It shows archive updates first, then writes pages directly when you run `apply`.
+This skill does not depend on BA-Agent code, does not use `WikiUpdatePlan`, and does not require an approval step. By default, run `archive` so the LLM extracts structured knowledge, writes pages, and rebuilds the index for recall.
 
 ## Initialization Guard
 
@@ -98,25 +98,35 @@ Run:
 
 Use this when you only want to inspect the Markdown extraction result.
 
-### 3. Preview archive updates
+### 3. Archive a document directly
 
 Run:
 
 ```bash
-.venv/bin/python skill/llm-wiki-generator/scripts/cli.py show-updates path/to/file.docx --source-type team_history
+.venv/bin/python skill/llm-wiki-generator/scripts/cli.py archive path/to/file.docx --source-type team_history
 ```
 
 This step uses:
 
 - bundled parsers for document conversion
 - an OpenAI-compatible model if configured
-- a deterministic fallback if no model is configured
 
-Output is an `ArchivePreview` that shows what pages would be created or updated, their status, confidence, evidence, and why they matter.
+Archive requires a configured OpenAI-compatible model. If the model is missing, unavailable, or returns invalid JSON, stop and ask the user to fix `LLM_PROVIDER`, `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` before archiving.
 
-### 4. Apply archive updates
+Output is an `ArchivePreview` summary plus the written wiki paths. The command rebuilds the index by default so the archived knowledge is ready for `answer`.
 
-Run:
+Use `--no-index` only when batching many files and planning to run `index` once at the end.
+
+### 4. Optional preview or manual apply
+
+If the user explicitly wants to inspect the LLM output without writing files, run:
+
+```bash
+.venv/bin/python skill/llm-wiki-generator/scripts/cli.py show-updates path/to/file.docx --source-type team_history
+```
+
+If the user already wants to write but not rebuild the index, run:
+
 
 ```bash
 .venv/bin/python skill/llm-wiki-generator/scripts/cli.py apply path/to/file.docx --source-type team_history
@@ -129,7 +139,7 @@ The writer is deterministic. It:
 - updates `20-wiki/index.md`
 - appends to `20-wiki/log.md`
 
-### 5. Build the local index
+### 5. Build the local index manually
 
 Run:
 
@@ -137,7 +147,7 @@ Run:
 .venv/bin/python skill/llm-wiki-generator/scripts/cli.py index
 ```
 
-This builds a local SQLite index for wiki retrieval.
+This builds a local SQLite index for wiki retrieval. It is already run by `archive` unless `--no-index` is used.
 
 ### 6. Answer from the wiki
 
@@ -157,7 +167,7 @@ Default scope is `stable`. You can override it:
 
 - `business_fact`: can become factual business knowledge if evidence is strong and there is no conflict
 - `industry_practice`: can become `source`, `synthesis`, or `prd_pattern`; it must not become customer fact
-- `team_history`: defaults to `draft`
+- `team_history`: can become `source`, `concept`, `synthesis`, or `prd_pattern`; it always defaults to `draft`
 - `feedback`: defaults to `draft`
 - conflicts never overwrite older knowledge; they become `20-wiki/conflicts/`
 

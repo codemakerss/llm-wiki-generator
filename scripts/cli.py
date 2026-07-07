@@ -10,7 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from llm_wiki_generator.answer import answer_question
-from llm_wiki_generator.archive import apply_preview, archive_source
+from llm_wiki_generator.archive import ArchiveLLMRequiredError, apply_preview, archive_source
 from llm_wiki_generator.bootstrap import initialize_wiki_location, inspect_bootstrap
 from llm_wiki_generator.config import load_settings
 from llm_wiki_generator.indexer import build_index
@@ -21,6 +21,10 @@ from llm_wiki_generator.vault import init_vault
 
 app = typer.Typer(help="Standalone LLM Wiki Generator")
 console = Console()
+
+
+def print_archive_error(error: ArchiveLLMRequiredError) -> None:
+    console.print(f"[red]error[/red] {error}")
 
 
 def parse_source_type(source_type: str) -> SourceType:
@@ -111,14 +115,23 @@ def render_preview(preview: dict) -> None:
     console.print(table)
 
 
+def load_archive_preview(source: Path, source_type: str):
+    settings = load_settings()
+    try:
+        preview = archive_source(source, parse_source_type(source_type), settings)
+    except ArchiveLLMRequiredError as exc:
+        print_archive_error(exc)
+        raise typer.Exit(code=1) from exc
+    return settings, preview
+
+
 @app.command("show-updates")
 def show_updates(
     source: Path,
     source_type: str = typer.Option(..., "--source-type"),
     as_json: bool = False,
 ) -> None:
-    settings = load_settings()
-    preview = archive_source(source, parse_source_type(source_type), settings)
+    _, preview = load_archive_preview(source, source_type)
     payload = preview.model_dump(mode="json")
     if as_json:
         console.print_json(json.dumps(payload, ensure_ascii=False))
@@ -126,10 +139,26 @@ def show_updates(
     render_preview(payload)
 
 
+@app.command("archive")
+def archive(
+    source: Path,
+    source_type: str = typer.Option(..., "--source-type"),
+    reindex: bool = typer.Option(True, "--index/--no-index", help="Rebuild the retrieval index after archiving."),
+) -> None:
+    settings, preview = load_archive_preview(source, source_type)
+    written = apply_preview(preview, source.resolve(), settings)
+    payload = preview.model_dump(mode="json")
+    render_preview(payload)
+    for path in written:
+        console.print(f"[green]archived[/green] {path}")
+    if reindex:
+        count = build_index(settings)
+        console.print(f"[green]indexed[/green] {count} documents into {settings.index_db}")
+
+
 @app.command()
 def apply(source: Path, source_type: str = typer.Option(..., "--source-type")) -> None:
-    settings = load_settings()
-    preview = archive_source(source, parse_source_type(source_type), settings)
+    settings, preview = load_archive_preview(source, source_type)
     written = apply_preview(preview, source.resolve(), settings)
     payload = preview.model_dump(mode="json")
     render_preview(payload)

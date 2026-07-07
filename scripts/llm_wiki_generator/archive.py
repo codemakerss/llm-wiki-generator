@@ -13,6 +13,10 @@ from .utils import dump_frontmatter, ensure_parent, extract_wikilinks, load_fron
 from .vault import RAW_DIRS, WIKI_DIRS, init_vault
 
 
+class ArchiveLLMRequiredError(RuntimeError):
+    pass
+
+
 PREVIEW_SYSTEM_PROMPT = """You are an LLM Wiki archivist.
 Return JSON only.
 Do not write files.
@@ -21,7 +25,8 @@ Identify reusable wiki knowledge from the converted Markdown source.
 Respect source boundaries:
 - business_fact may become factual business knowledge when evidence is strong
 - industry_practice may become source, synthesis, or prd_pattern but not business fact
-- team_history defaults to draft
+- team_history may become source, concept, synthesis, or prd_pattern and always stays draft
+- team_history PRD patterns may come from historical PRDs, team decisions, requirement structures, review flows, reusable templates, and repeated product judgments
 - feedback defaults to draft
 - contradictions must become conflict
 Output this shape:
@@ -137,7 +142,9 @@ def deterministic_preview(document: MarkdownDocument, source_type: SourceType) -
 def build_preview(document: MarkdownDocument, source_type: SourceType, settings: Settings) -> ArchivePreview:
     llm = OpenAICompatibleLLM(settings)
     if not llm.available:
-        return deterministic_preview(document, source_type)
+        raise ArchiveLLMRequiredError(
+            "LLM is required for archive preview. Set LLM_PROVIDER, LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL in .env."
+        )
 
     prompt = f"""Source type: {source_type.value}
 Source path: {document.source_path.name}
@@ -149,9 +156,11 @@ Converted Markdown:
     try:
         payload = llm.complete_json(PREVIEW_SYSTEM_PROMPT, prompt)
         preview = ArchivePreview.model_validate(payload)
-        return enforce_rules(preview)
-    except (ValidationError, ValueError, RuntimeError, KeyError):
-        return deterministic_preview(document, source_type)
+    except (ValidationError, ValueError, RuntimeError, KeyError) as exc:
+        raise ArchiveLLMRequiredError(
+            "LLM archive preview failed. Fix the LLM response or configuration before archiving."
+        ) from exc
+    return enforce_rules(preview)
 
 
 def enforce_rules(preview: ArchivePreview) -> ArchivePreview:
@@ -247,7 +256,6 @@ def update_index_and_log(settings: Settings, preview: ArchivePreview, written_pa
 
 
 def archive_source(source_path: Path, source_type: SourceType, settings: Settings) -> ArchivePreview:
-    init_vault(settings)
     document = convert_to_markdown(source_path)
     return build_preview(document, source_type, settings)
 

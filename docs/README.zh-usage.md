@@ -4,15 +4,16 @@
 
 `LLM Wiki Generator` 是一个对任何 AI agent、任何团队工作流、以及独立 CLI 使用都友好的工具。它既可以作为 skill 使用，也可以直接作为 Python CLI 运行。它的目标不是“直接把文档丢给模型问答”，而是先把知识转成结构化 wiki，再基于稳定知识进行检索和回答。
 
-这份文档更偏实际操作，适合你准备开始导入资料、预览归档、生成知识页面和问答时使用。
+这份文档更偏实际操作，适合你准备开始导入资料、直接归档、生成知识页面和问答时使用。
 
 ## 1. 功能概览
 
 这个项目提供 5 个核心能力：
 
 - 文档转 Markdown：`convert`
-- 归档预览：`show-updates`
-- 正式归档：`apply`
+- 直接归档：`archive`
+- 可选预览：`show-updates`
+- 只写入不重建索引：`apply`
 - 构建检索索引：`index`
 - 从 wiki 问答：`answer`
 
@@ -84,7 +85,7 @@ WIKI_SCOPE=stable
 - `WIKI_ROOT` 是知识库落盘目录
 - `WIKI_INDEX_DB` 是本地 SQLite 索引文件
 - `WIKI_SCOPE` 默认问答范围，默认是 `stable`
-- 如果 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 没配齐，系统会退回到 deterministic fallback
+- `archive`、`show-updates` 和 `apply` 必须配置 `LLM_PROVIDER`、`LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`；`answer` 在无模型时仍可退回到摘录式回答
 
 ## 3. 初始化知识库
 
@@ -164,6 +165,31 @@ python scripts/cli.py convert path/to/file.pdf
 - 先验证源文件内容是否可被正常抽取
 - 调试导入前的原始文本质量
 
+### `archive`
+
+经过 LLM 抽取后直接写入知识库，并默认重建检索索引。
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history
+```
+
+执行后会发生这些事：
+
+1. 把原文件复制到 `10-raw/<source_type>/`
+2. 把结构化页面写入 `20-wiki/`
+3. 如果页面已存在，则合并 metadata，并把新内容追加为更新块
+4. 更新 `20-wiki/index.md`
+5. 追加 `20-wiki/log.md`
+6. 重建 SQLite 检索索引，方便后续 `answer` 召回
+
+如果你准备批量导入很多文件，可以先跳过自动索引：
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history --no-index
+```
+
+然后在一批文件结束后手动执行 `index`。
+
 ### `show-updates`
 
 预览归档结果，不写入任何 wiki 页面。
@@ -181,11 +207,12 @@ python scripts/cli.py show-updates path/to/file.docx --source-type team_history
 - 证据片段
 - 归档理由
 
-这一步非常重要，因为它是“先审后写”的关键。
+这是可选审计步骤，适合你想看 LLM 会生成什么页面但暂时不写入时使用。
+这一步必须配置 OpenAI-compatible LLM。如果模型配置缺失，或者模型返回内容无法解析，命令会直接失败，不会写入归档文件。
 
 ### `apply`
 
-把预览结果真正写入知识库。
+经过 LLM 抽取后写入知识库，但不自动重建检索索引。
 
 ```bash
 python scripts/cli.py apply path/to/file.docx --source-type team_history
@@ -199,7 +226,7 @@ python scripts/cli.py apply path/to/file.docx --source-type team_history
 4. 更新 `20-wiki/index.md`
 5. 追加 `20-wiki/log.md`
 
-也就是说，`apply` 才是真正意义上的“归档”。
+如果你希望归档后立即用于召回，优先使用 `archive`。
 
 ### `index`
 
@@ -269,6 +296,7 @@ python scripts/cli.py answer "团队历史里提到的设计思路有哪些？" 
 特点：
 
 - 默认进入 `draft`
+- 也可以从历史 PRD、团队决策、需求结构、评审流程和可复用产品判断中提取 `prd_pattern`
 
 ### `feedback`
 
@@ -288,47 +316,44 @@ python scripts/cli.py answer "团队历史里提到的设计思路有哪些？" 
 
 ```bash
 python scripts/cli.py init
-python scripts/cli.py show-updates docs/team-retro.docx --source-type team_history
-python scripts/cli.py apply docs/team-retro.docx --source-type team_history
-python scripts/cli.py index
+python scripts/cli.py archive docs/team-retro.docx --source-type team_history
 python scripts/cli.py answer "团队过去在架构上有哪些反复出现的思路？" --scope stable-draft
 ```
 
 建议习惯：
 
-- 每次先 `show-updates`
-- 确认内容合理后再 `apply`
-- 每轮批量归档后重新执行一次 `index`
+- 日常使用优先 `archive`，让 LLM 生成结果后直接归档并重建索引
+- 只有需要审计 LLM 输出时，才先运行 `show-updates`
+- 批量归档时可以使用 `archive --no-index`，最后统一执行一次 `index`
 - 第一次初始化完成后，立即决定是否现在导入第一份文档，避免初始化后流程中断
 
-## 7. 模型模式与 fallback
+## 7. 模型要求
 
-如果配置了兼容 OpenAI Chat Completions 的模型接口：
+上传归档流程必须配置兼容 OpenAI Chat Completions 的模型接口：
 
-- 归档预览会更智能
-- 问答会基于检索结果生成更自然的回答
+- `show-updates` 必须由模型生成归档预览
+- `archive` 和 `apply` 会先走 LLM 抽取，如果模型不可用或返回非法 JSON，会直接失败
+- 归档预览失败时，不会复制原文件，也不会写入 wiki 页面
 
-如果没有配置模型：
+问答流程仍保留无模型可用性：
 
-- `show-updates` 仍会给出 deterministic preview
 - `answer` 会退化为摘录式回答
 
-这意味着项目即使在“无模型模式”下，也仍然可用。
+也就是说，归档是严格模型模式；已经建好索引的内容，仍可在无模型时做摘录式检索回答。
 
 ## 8. 总结
 
-如果你想把“原始资料 -> 结构化知识 -> 可检索问答”做成一个可控、可审阅、可持续更新的流程，这个项目的推荐使用方式就是：
+如果你想把“原始资料 -> 结构化知识 -> 可检索问答”做成一个可控、可持续更新的流程，这个项目的推荐使用方式就是：
 
 1. `init`
-2. `show-updates`
-3. `apply`
-4. `index`
-5. `answer`
+2. `archive`
+3. `answer`
 
 最重要的心智模型是：
 
 - `convert` 是抽取
-- `show-updates` 是审阅
-- `apply` 是归档
+- `archive` 是 LLM 抽取、归档、建索引的一步式入口
+- `show-updates` 是可选审阅
+- `apply` 是只归档、不自动建索引
 - `index` 是检索准备
 - `answer` 是消费知识

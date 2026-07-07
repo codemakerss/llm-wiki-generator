@@ -1,29 +1,28 @@
 # LLM Wiki Generator
 
-A preview-first document ingestion and retrieval workflow for building a structured, local, Obsidian-compatible LLM Wiki.
+An LLM-first document ingestion and retrieval workflow for building a structured, local, Obsidian-compatible LLM Wiki.
 
-LLM Wiki Generator turns raw source files into traceable wiki knowledge through an explicit pipeline: `convert -> show-updates -> apply -> index -> answer`.
-It is designed for agent workflows, local knowledge systems, and standalone CLI usage where auditability matters more than direct "chat with files" convenience.
+LLM Wiki Generator turns raw source files into traceable wiki knowledge through a direct pipeline: `archive -> answer`.
+For audit-heavy workflows, you can still inspect proposed updates with `show-updates` before writing.
 
 ## Why This Exists
 
 Most document-driven knowledge workflows break down in one of two ways:
 
 - raw files remain unstructured and difficult to reuse
-- LLM-based ingestion writes too much, too early, with too little control
+- LLM-based ingestion writes opaque knowledge that is hard to recall later
 
-This project takes a stricter path.
+This project takes a structured path.
 
-Instead of treating source files as a chat substrate, it treats them as inputs to a staged knowledge pipeline:
+Instead of treating source files as a chat substrate, it treats them as inputs to an LLM-backed knowledge compiler:
 
 1. convert source material into normalized text
-2. generate proposed wiki updates
-3. let the user review those updates
-4. write approved knowledge into a vault
-5. build a retrieval index over the result
+2. use an LLM to extract structured wiki updates
+3. write knowledge directly into a vault
+4. rebuild the retrieval index for immediate recall
 
 The goal is not just answering questions.
-The goal is building a knowledge base that can keep evolving without becoming opaque.
+The goal is building a knowledge base that can keep evolving and remain searchable.
 
 ## Quick Navigation
 
@@ -59,13 +58,13 @@ flowchart TD
     B -- "Yes" --> J["Provide source document"]
     I --> J
 
-    J --> K["convert"]
-    K --> L["show-updates"]
-    L --> M{"Approve proposed archive updates?"}
-    M -- "No" --> N["Stop or revise source input"]
-    M -- "Yes" --> O["apply"]
-    O --> P["index"]
+    J --> K["archive"]
+    K --> L["LLM extracts structured updates"]
+    L --> M["Write raw source and wiki pages"]
+    M --> P["index"]
     P --> Q["answer"]
+
+    J -. "Optional audit path" .-> R["show-updates"]
 ```
 
 ## First-Time Path
@@ -76,15 +75,18 @@ For a first-time user, the shortest useful path is:
 2. run `bootstrap-status`
 3. run `bootstrap-init` if the workspace is not initialized
 4. provide the first source document
-5. review proposed updates with `show-updates`
-6. apply approved updates, build the index, and start querying
+5. run `archive` to let the LLM extract and write knowledge directly
+6. start querying the indexed wiki
 
 If you already know the desired vault location, you can still configure `.env` first and call `init` directly.
+Archive, preview, and apply require a configured OpenAI-compatible LLM; the no-model fallback is only used for answer extraction.
 
 ## Properties
 
 - Supports `PDF`, `DOCX`, `PPTX`, `XLSX`, and `TXT`
-- Uses a preview-before-write archive flow
+- Uses an LLM-first direct archive flow
+- Requires LLM-backed extraction for document uploads
+- Rebuilds the retrieval index by default after direct archive
 - Writes into an Obsidian-compatible vault layout
 - Keeps raw sources and structured knowledge separate
 - Builds a local SQLite retrieval index
@@ -150,16 +152,22 @@ Convert a file:
 python scripts/cli.py convert path/to/file.pdf
 ```
 
-Preview archive updates:
+Directly archive a document and rebuild the retrieval index:
+
+```bash
+python scripts/cli.py archive path/to/file.docx --source-type team_history
+```
+
+Optionally preview archive updates without writing:
 
 ```bash
 python scripts/cli.py show-updates path/to/file.docx --source-type team_history
 ```
 
-Apply approved updates:
+Write without rebuilding the index:
 
 ```bash
-python scripts/cli.py apply path/to/file.docx --source-type team_history
+python scripts/cli.py archive path/to/file.docx --source-type team_history --no-index
 ```
 
 Build the retrieval index:
@@ -217,7 +225,7 @@ Behavior rules:
 
 - `business_fact` may become stable business knowledge when evidence is strong
 - `industry_practice` may become patterns or synthesis, but not customer truth
-- `team_history` defaults to `draft`
+- `team_history` may also produce PRD patterns from historical PRDs and team decisions, but remains `draft`
 - `feedback` defaults to `draft`
 - conflicts never overwrite older knowledge; they go into `20-wiki/conflicts/`
 
@@ -227,11 +235,11 @@ This repository prefers explicit state transitions over opaque ingestion.
 
 Key design choices:
 
-- preview before write
+- direct LLM-backed archive by default
 - deterministic archive application
 - persistent raw source capture
 - local retrieval over archived markdown
-- configurable LLM usage, but usable fallback behavior without it
+- required LLM usage for archive extraction, with extractive fallback reserved for answering
 
 The result is closer to a small knowledge compiler than a chat wrapper around files.
 
