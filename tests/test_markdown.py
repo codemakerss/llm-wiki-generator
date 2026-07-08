@@ -13,7 +13,7 @@ from llm_wiki_generator.markdown import SUPPORTED_EXTENSIONS, assert_supported, 
 
 
 def test_supported_extensions_are_fixed() -> None:
-    assert SUPPORTED_EXTENSIONS == {".pdf", ".docx", ".pptx", ".xlsx", ".txt"}
+    assert SUPPORTED_EXTENSIONS == {".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".md", ".markdown"}
 
 
 def test_convert_txt_to_markdown(tmp_path: Path) -> None:
@@ -27,9 +27,22 @@ def test_convert_txt_to_markdown(tmp_path: Path) -> None:
     assert "world" in document.markdown
 
 
+@pytest.mark.parametrize("extension", [".md", ".markdown"])
+def test_convert_markdown_to_markdown_passthrough(tmp_path: Path, extension: str) -> None:
+    source = tmp_path / f"sample{extension}"
+    source.write_text("# Heading\n\n- already markdown\n", encoding="utf-8")
+
+    document = convert_to_markdown(source)
+
+    assert document.title == "sample"
+    assert document.extension == extension
+    assert "# Heading" in document.markdown
+    assert "- already markdown" in document.markdown
+
+
 def test_convert_command_can_emit_json_for_host_model(tmp_path: Path) -> None:
-    source = tmp_path / "sample.txt"
-    source.write_text("hello\nworld\n", encoding="utf-8")
+    source = tmp_path / "sample.md"
+    source.write_text("# hello\n\nworld\n", encoding="utf-8")
     runner = CliRunner()
 
     result = runner.invoke(cli_module.app, ["convert", str(source), "--as-json"])
@@ -37,12 +50,12 @@ def test_convert_command_can_emit_json_for_host_model(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["title"] == "sample"
-    assert payload["extension"] == ".txt"
+    assert payload["extension"] == ".md"
     assert "hello" in payload["markdown"]
 
 
 def test_unsupported_extension_raises(tmp_path: Path) -> None:
-    source = tmp_path / "sample.md"
+    source = tmp_path / "sample.rtf"
     source.write_text("# nope", encoding="utf-8")
 
     with pytest.raises(ValueError):
@@ -55,6 +68,10 @@ def test_converts_all_supported_formats(tmp_path: Path) -> None:
     txt_path = tmp_path / "sample.txt"
     txt_path.write_text("business background\nmetrics\n", encoding="utf-8")
     files.append(txt_path)
+
+    md_path = tmp_path / "sample.md"
+    md_path.write_text("# Business Notes\n\n- archived markdown\n", encoding="utf-8")
+    files.append(md_path)
 
     docx_path = tmp_path / "sample.docx"
     doc = Document()
@@ -88,5 +105,5 @@ def test_converts_all_supported_formats(tmp_path: Path) -> None:
 
     converted = [convert_to_markdown(path) for path in files]
 
-    assert len(converted) == 5
+    assert len(converted) == 6
     assert all(document.markdown.strip() for document in converted)

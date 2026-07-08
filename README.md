@@ -87,7 +87,7 @@ Host-model skill usage does not require `.env` model settings such as `LLM_API_K
 
 ## Properties
 
-- Supports `PDF`, `DOCX`, `PPTX`, `XLSX`, and `TXT`
+- Supports `PDF`, `DOCX`, `PPTX`, `XLSX`, `TXT`, `MD`, and `Markdown`
 - Uses Claude Code, Codex, or OpenCode as the default archive/answer model when installed as a skill
 - Provides deterministic CLI tools for conversion, preview application, indexing, and search
 - Rebuilds the retrieval index by default after `apply-preview` or standalone `archive`
@@ -294,6 +294,8 @@ The result is closer to a small knowledge compiler than a chat wrapper around fi
 - SQLite FTS
 - host-model skill mode plus optional OpenAI-compatible API mode
 - document parsers for DOCX, PPTX, XLSX, and PDF
+
+Note: MarkItDown is not integrated. Markdown files are supported natively by reading `.md` and `.markdown` content as-is.
 
 ## Learn More
 

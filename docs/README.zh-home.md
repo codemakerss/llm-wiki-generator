@@ -87,7 +87,7 @@ flowchart TD
 
 ## 核心特性
 
-- 支持 `PDF`、`DOCX`、`PPTX`、`XLSX`、`TXT`
+- 支持 `PDF`、`DOCX`、`PPTX`、`XLSX`、`TXT`、`MD`、`Markdown`
 - 安装为 skill 后默认使用 Claude Code、Codex、OpenCode 的宿主模型做归档和回答
 - 提供确定性 CLI 工具负责转换、写入、索引、检索
 - 直接归档后默认重建检索索引
@@ -265,6 +265,8 @@ index.sqlite3
 - SQLite FTS
 - 宿主模型 skill 模式，以及可选 OpenAI-compatible API 模式
 - DOCX / PPTX / XLSX / PDF 文档解析库
+
+说明：当前没有集成 MarkItDown。Markdown 文件通过 `.md` 和 `.markdown` 原样读取。
 
 ## 延伸阅读
 

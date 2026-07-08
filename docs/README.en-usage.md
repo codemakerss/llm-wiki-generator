@@ -26,6 +26,10 @@ Supported input formats:
 - `PPTX`
 - `XLSX`
 - `TXT`
+- `MD`
+- `Markdown`
+
+Note: MarkItDown is not integrated. Markdown files are read as-is from `.md` and `.markdown` files.
 
 ## 2. Installation and Setup
 

@@ -26,6 +26,10 @@
 - `PPTX`
 - `XLSX`
 - `TXT`
+- `MD`
+- `Markdown`
+
+说明：当前没有集成 MarkItDown。Markdown 文件通过 `.md` 和 `.markdown` 原样读取进入归档流程。
 
 ## 2. 安装与准备
 

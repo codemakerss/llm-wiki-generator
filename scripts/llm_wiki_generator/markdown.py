@@ -9,7 +9,7 @@ from pptx import Presentation
 from pypdf import PdfReader
 
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".txt"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".txt", ".md", ".markdown"}
 
 
 @dataclass
@@ -81,7 +81,7 @@ def convert_to_markdown(source_path: Path) -> MarkdownDocument:
         raise FileNotFoundError(source_path)
 
     suffix = source_path.suffix.lower()
-    if suffix == ".txt":
+    if suffix in {".txt", ".md", ".markdown"}:
         markdown = source_path.read_text(encoding="utf-8")
         title = source_path.stem
     elif suffix == ".docx":

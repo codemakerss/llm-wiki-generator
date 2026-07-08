@@ -1,6 +1,6 @@
 ---
 name: llm-wiki-generator
-description: Build or query a standalone Obsidian-compatible LLM Wiki from PDF, DOCX, PPTX, XLSX, and TXT sources. Use when you need to convert files to Markdown, preview archive updates, write structured wiki pages, index the stable knowledge base, or answer questions from the wiki without depending on BA-Agent code.
+description: Build or query a standalone Obsidian-compatible LLM Wiki from PDF, DOCX, PPTX, XLSX, TXT, and Markdown sources. Use when you need to convert files to Markdown, preview archive updates, write structured wiki pages, index the stable knowledge base, or answer questions from the wiki without depending on BA-Agent code.
 ---
 
 # LLM Wiki Generator
@@ -57,13 +57,17 @@ If the user declines initialization, stop the archive/query flow and explain tha
 
 ## Supported Inputs
 
-The archive pipeline accepts exactly these five file types:
+The archive pipeline accepts these file types:
 
 - `PDF`
 - `DOCX`
 - `PPTX`
 - `XLSX`
 - `TXT`
+- `MD`
+- `Markdown`
+
+Markdown files are read as-is from `.md` and `.markdown` files. MarkItDown is not integrated in the current implementation.
 
 ## Workflow
 
